@@ -28,6 +28,16 @@ function parseKidNamesCSV(text) {
   return lines.slice(1).map(line => line.split(',')[0].trim());
 }
 
+function shuffleArray(array) {
+  // Fisher-Yates shuffle
+  const arr = [...array];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
 function assignGroups(kids, friendsList) {
   // Initial assignment: alternate to balance group sizes
   const group1 = [];
@@ -88,8 +98,7 @@ function App() {
   const [header2, setHeader2] = useState([]);
   const [header3, setHeader3] = useState([]);
   const [error, setError] = useState('');
-  const [group1, setGroup1] = useState([]);
-  const [group2, setGroup2] = useState([]);
+  const [groupPairs, setGroupPairs] = useState([]);
   const [friendsList, setFriendsList] = useState([]);
 
   const handleFile1Change = (e) => {
@@ -131,9 +140,19 @@ function App() {
           // Union of all kids from file1 and file2
           const kidSet = new Set([...kids1, ...kids2]);
           const allKids = Array.from(kidSet);
-          const [g1, g2] = assignGroups(allKids, fList);
-          setGroup1(g1);
-          setGroup2(g2);
+          // Generate three pairs
+          const pairs = [];
+          for (let n = 0; n < 3; n++) {
+            const shuffledKids = shuffleArray(allKids);
+            const [g1, g2] = assignGroups(shuffledKids, fList);
+            pairs.push({
+              group1: g1,
+              group2: g2,
+              score1: groupScore(g1, fList),
+              score2: groupScore(g2, fList)
+            });
+          }
+          setGroupPairs(pairs);
         };
         reader3.onerror = () => setError('Error reading File 3.');
         reader3.readAsText(file3);
@@ -229,22 +248,23 @@ function App() {
           {header3.length === 0 && <div>No data</div>}
         </div>
         <div style={{ marginTop: '2rem' }}>
-          <h3>Generated List 1</h3>
-          <div>Total: {group1.length}</div>
-          <div>Friendship Score: {groupScore(group1, friendsList)}</div>
-          <ul>
-            {group1.map((kid, idx) => (
-              <li key={idx}>{kid}</li>
-            ))}
-          </ul>
-          <h3>Generated List 2</h3>
-          <div>Total: {group2.length}</div>
-          <div>Friendship Score: {groupScore(group2, friendsList)}</div>
-          <ul>
-            {group2.map((kid, idx) => (
-              <li key={idx}>{kid}</li>
-            ))}
-          </ul>
+          {groupPairs.map((pair, idx) => (
+            <div key={idx} style={{ marginBottom: '2rem', border: '1px solid #ccc', padding: '1rem' }}>
+              <h3>Pair {idx + 1}</h3>
+              <div><strong>List 1</strong> (Total: {pair.group1.length}) Friendship Score: {pair.score1}</div>
+              <ul>
+                {pair.group1.map((kid, i) => (
+                  <li key={i}>{kid}</li>
+                ))}
+              </ul>
+              <div><strong>List 2</strong> (Total: {pair.group2.length}) Friendship Score: {pair.score2}</div>
+              <ul>
+                {pair.group2.map((kid, i) => (
+                  <li key={i}>{kid}</li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
       </header>
     </div>
