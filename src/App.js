@@ -12,7 +12,6 @@ function parseCSV(text) {
 function parseFriendsCSV(text) {
   const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
   if (lines.length < 2) return [];
-  const header = lines[0].split(',');
   return lines.slice(1).map(line => {
     const cols = line.split(',');
     return {
@@ -87,6 +86,52 @@ function groupScore(group, friendsList) {
   return score;
 }
 
+function kidFriendshipScore(kid, group, friendsList) {
+  const entry = friendsList.find(f => f.kid === kid);
+  if (!entry) return 0;
+  let score = 0;
+  entry.friends.forEach((friend, idx) => {
+    if (group.includes(friend)) {
+      if (idx === 0) score += 3;
+      else if (idx === 1) score += 2;
+      else if (idx === 2) score += 1;
+    }
+  });
+  return score;
+}
+
+function arePairPermutations(pairA, pairB) {
+  // Check if group1/group2 in pairA is group2/group1 in pairB
+  const a1 = [...pairA.group1].sort().join(',');
+  const a2 = [...pairA.group2].sort().join(',');
+  const b1 = [...pairB.group1].sort().join(',');
+  const b2 = [...pairB.group2].sort().join(',');
+  return (a1 === b1 && a2 === b2) || (a1 === b2 && a2 === b1);
+}
+
+function getTopUniquePairs(allKids, friendsList, numPairs = 100, topN = 3) {
+  const pairs = [];
+  for (let n = 0; n < numPairs; n++) {
+    const shuffledKids = shuffleArray(allKids);
+    const [g1, g2] = assignGroups(shuffledKids, friendsList);
+    const pair = {
+      group1: g1,
+      group2: g2,
+      score1: groupScore(g1, friendsList),
+      score2: groupScore(g2, friendsList)
+    };
+    // Check for permutation duplicates
+    if (!pairs.some(p => arePairPermutations(p, pair))) {
+      pairs.push(pair);
+    }
+    // If we already have enough unique pairs, stop early
+    if (pairs.length >= numPairs) break;
+  }
+  // Sort by total score descending
+  pairs.sort((a, b) => (b.score1 + b.score2) - (a.score1 + a.score2));
+  return pairs.slice(0, topN);
+}
+
 function App() {
   const [file1, setFile1] = useState(null);
   const [file2, setFile2] = useState(null);
@@ -140,19 +185,9 @@ function App() {
           // Union of all kids from file1 and file2
           const kidSet = new Set([...kids1, ...kids2]);
           const allKids = Array.from(kidSet);
-          // Generate three pairs
-          const pairs = [];
-          for (let n = 0; n < 3; n++) {
-            const shuffledKids = shuffleArray(allKids);
-            const [g1, g2] = assignGroups(shuffledKids, fList);
-            pairs.push({
-              group1: g1,
-              group2: g2,
-              score1: groupScore(g1, fList),
-              score2: groupScore(g2, fList)
-            });
-          }
-          setGroupPairs(pairs);
+          // Generate 100 unique pairs, print top 3
+          const topPairs = getTopUniquePairs(allKids, fList, 100, 3);
+          setGroupPairs(topPairs);
         };
         reader3.onerror = () => setError('Error reading File 3.');
         reader3.readAsText(file3);
@@ -171,15 +206,15 @@ function App() {
         <h2>Send All Files</h2>
         <form onSubmit={handleSubmitAll} style={{ marginBottom: '2rem' }}>
           <label>
-            File 1:
+            Class 1:
             <input type="file" onChange={handleFile1Change} />
           </label>
           <label style={{ marginLeft: '1rem' }}>
-            File 2:
+            Class 2:
             <input type="file" onChange={handleFile2Change} />
           </label>
           <label style={{ marginLeft: '1rem' }}>
-            File 3 (Kid & Friends CSV):
+            Kids & Friends:
             <input type="file" onChange={handleFile3Change} />
           </label>
           <button type="submit" style={{ marginLeft: '1rem' }}>Send All Files</button>
@@ -254,13 +289,13 @@ function App() {
               <div><strong>List 1</strong> (Total: {pair.group1.length}) Friendship Score: {pair.score1}</div>
               <ul>
                 {pair.group1.map((kid, i) => (
-                  <li key={i}>{kid}</li>
+                  <li key={i}>{kid} ({kidFriendshipScore(kid, pair.group1, friendsList)})</li>
                 ))}
               </ul>
               <div><strong>List 2</strong> (Total: {pair.group2.length}) Friendship Score: {pair.score2}</div>
               <ul>
                 {pair.group2.map((kid, i) => (
-                  <li key={i}>{kid}</li>
+                  <li key={i}>{kid} ({kidFriendshipScore(kid, pair.group2, friendsList)})</li>
                 ))}
               </ul>
             </div>
